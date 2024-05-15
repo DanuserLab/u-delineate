@@ -431,6 +431,10 @@ classdef FilamentSegmentationProcess < ImageProcessingProcess
             % the flag for if a channel has been specifically signed
             % setting, without being the same with all other selected of channels
             funParams.channel_specific=0;
+
+            % Flag to enable and disable (default) the filament drawing on the figures in each loop while the process is running
+            % Added by Qiongjing (Jenny) Zou
+            funParams.enableFilamentDrawing = false; % when it is true, then the process is very slow.
         end
     end
 end

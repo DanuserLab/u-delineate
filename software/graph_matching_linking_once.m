@@ -23,6 +23,9 @@ function [output_model,current_matching_bw,new_model_ind,transformer,final_set_r
 % 
 % 
 
+% Added a new parameter (funParams.enableFilamentDrawing) to the process to disable Filament drawing 
+% on the figure in each loop, in order to improve running time.
+% Updated by Qiongjing (Jenny) Zou, May 2024
 
 new_model_ind=[];
 output_model=current_model;
@@ -770,11 +773,18 @@ set(h11,'Visible',set_visible);imagescc(currentImg*0); caxis([0 1])
 h21 = figure(21);
 set(h21,'Visible',set_visible);imagescc(currentImg*0+1); caxis([0 1])
 
+% Added the option to enable and disable filament drawing in each loop, May 2024
+if ~funParams.enableFilamentDrawing
+    h11=figure(11);set(h11,'Visible',set_visible);
+    hold on;
+end
 % Original_set_Good_ind=Good_ind;
 for ind = Original_set_Good_ind'
     [ind_y,ind_x] = find(labelMask==ind);
+    if funParams.enableFilamentDrawing
     h11=figure(11);set(h11,'Visible',set_visible);
     hold on;
+    end
     plot(ind_x,ind_y,'.');
     
     R(sub2ind(size(currentImg),round(ind_y),round(ind_x)))=0;
@@ -782,11 +792,17 @@ for ind = Original_set_Good_ind'
     B(sub2ind(size(currentImg),round(ind_y),round(ind_x)))=1;
 end
 
-
-for ind = Original_set_Good_ind'
-    [ind_y,ind_x] = find(labelMask==ind);
+% Added the option to enable and disable filament drawing in each loop, May 2024
+if ~funParams.enableFilamentDrawing
     h21=figure(21);set(h21,'Visible',set_visible);
     hold on;
+end
+for ind = Original_set_Good_ind'
+    [ind_y,ind_x] = find(labelMask==ind);
+    if funParams.enableFilamentDrawing
+    h21=figure(21);set(h21,'Visible',set_visible);
+    hold on;
+    end
     plot(ind_x,ind_y,'.');
     
     whiteR(sub2ind(size(currentImg),round(ind_y),round(ind_x)))=0;
@@ -794,9 +810,15 @@ for ind = Original_set_Good_ind'
     whiteB(sub2ind(size(currentImg),round(ind_y),round(ind_x)))=1;
 end
 
+% Added the option to enable and disable filament drawing in each loop, May 2024
+if ~funParams.enableFilamentDrawing
+    h11=figure(11);hold on;set(h11,'Visible',set_visible);
+end
 for ind = setdiff(final_set_rescue(:),Original_set_Good_ind)'
     [ind_y,ind_x] = find(labelMask==ind);
+    if funParams.enableFilamentDrawing
     h11=figure(11);hold on;set(h11,'Visible',set_visible);
+    end
     plot(ind_x,ind_y,'r.');
     
     R(sub2ind(size(currentImg),round(ind_y),round(ind_x)))=1;
@@ -805,10 +827,17 @@ for ind = setdiff(final_set_rescue(:),Original_set_Good_ind)'
     
 end
 
-for ind = setdiff(final_set_rescue(:),Original_set_Good_ind)'
-    [ind_y,ind_x] = find(labelMask==ind);
+% Added the option to enable and disable filament drawing in each loop, May 2024
+if ~funParams.enableFilamentDrawing
     h21=figure(21);hold on;set(h21,'Visible',set_visible);
     hold on;
+end
+for ind = setdiff(final_set_rescue(:),Original_set_Good_ind)'
+    [ind_y,ind_x] = find(labelMask==ind);
+    if funParams.enableFilamentDrawing
+    h21=figure(21);hold on;set(h21,'Visible',set_visible);
+    hold on;
+    end
     plot(ind_x,ind_y,'r.');
     
     whiteR(sub2ind(size(currentImg),round(ind_y),round(ind_x)))=1;
@@ -817,10 +846,17 @@ for ind = setdiff(final_set_rescue(:),Original_set_Good_ind)'
     
 end
 
-for ind = 1:connect_count
-    XY = final_set_connection{ind};
+% Added the option to enable and disable filament drawing in each loop, May 2024
+if ~funParams.enableFilamentDrawing
     h11=figure(11);hold on;set(h11,'Visible',set_visible);
     hold on;
+end
+for ind = 1:connect_count
+    XY = final_set_connection{ind};
+    if funParams.enableFilamentDrawing
+    h11=figure(11);hold on;set(h11,'Visible',set_visible);
+    hold on;
+    end
     plot(XY(1,:),XY(2,:),'g.');
     
     R(sub2ind(size(currentImg),round(XY(2,:)),round(XY(1,:))))=0;
@@ -830,10 +866,17 @@ for ind = 1:connect_count
     
 end
 
-for ind = 1:connect_count
-    XY = final_set_connection{ind};
+% Added the option to enable and disable filament drawing in each loop, May 2024
+if ~funParams.enableFilamentDrawing
     h21=figure(21);hold on;set(h21,'Visible',set_visible);
     hold on;
+end
+for ind = 1:connect_count
+    XY = final_set_connection{ind};
+    if funParams.enableFilamentDrawing
+    h21=figure(21);hold on;set(h21,'Visible',set_visible);
+    hold on;
+    end
     plot(XY(1,:),XY(2,:),'g.');
     
     whiteR(sub2ind(size(currentImg),round(XY(2,:)),round(XY(1,:))))=0;
