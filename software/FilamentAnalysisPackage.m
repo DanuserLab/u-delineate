@@ -35,7 +35,7 @@ classdef FilamentAnalysisPackage < Package
                 outputDir = ip.Results.outputDir;
                 
                 super_args{1} = owner;
-                super_args{2} = [outputDir  filesep 'FilamentAnalysisPackage'];
+                super_args{2} = [outputDir  filesep 'uDelineatePackage']; % Updated 2024-9-3. The old save folder name was FilamentAnalysisPackage
             end
             % Call the superclass constructor
             obj = obj@Package(super_args{:});
