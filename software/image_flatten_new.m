@@ -1,6 +1,27 @@
-function movieData = image_flatten(movieData, paramsIn, varargin)
-
-% for most cases, don't do background removal here.
+function image_flatten_new(movieDataOrProcess, varargin)
+% ImageFlattenProcess wrapper function for ImageFlattenProcess.
+%
+% INPUT
+% movieDataOrProcess - either a MovieData (legacy)
+%                      or a Process (new as of July 2016)
+%
+% param - (optional) A struct describing the parameters, overrides the
+%                    parameters stored in the process (as of Aug 2016)
+%
+% OUTPUT
+% none (saved to p.OutputDirectory)
+%
+% Changes
+% As of July 2016, the first argument could also be a Process. Use
+% getOwnerAndProcess to simplify compatability.
+%
+% As of August 2016, the standard second argument should be the parameter
+% structure
+%
+%
+% This wrapper fcn was written based on image_flatten.m written by Liya Ding from 2015 or before.
+% The way image_flatten was written is outdated, and not compatible with features on packageGUI, etc.
+% Qiongjing (Jenny) Zou, Oct 2024
 %
 % Copyright (C) 2024, Danuser Lab - UTSouthwestern 
 %
@@ -20,105 +41,74 @@ function movieData = image_flatten(movieData, paramsIn, varargin)
 % along with FilamentAnalysisPackage.  If not, see <http://www.gnu.org/licenses/>.
 % 
 % 
-background_removal_flag =0;
 
-% Find the package of Filament Analysis
-nPackage = length(movieData.packages_);
+%% ------------------ Input ---------------- %%
+ip = inputParser;
+ip.addRequired('MD', @(x) isa(x,'MovieData') || isa(x,'Process') && isa(x.getOwner(),'MovieData'));
+ip.addOptional('paramsIn',[], @isstruct);
+ip.parse(movieDataOrProcess, varargin{:});
+paramsIn = ip.Results.paramsIn;
 
-indexFilamentPackage = 0;
-for i = 1 : nPackage
-    if(isequal(class(movieData.packages_{i}),'FilamentAnalysisPackage'))
-        indexFilamentPackage = i;
-        break;
-    end
-end
+%% Registration
+% Get MovieData object and Process
+[movieData, thisProc] = getOwnerAndProcess(movieDataOrProcess, 'ImageFlattenProcess', true);
+p = parseProcessParams(thisProc, paramsIn); % If parameters are explicitly given, they should be used
+% rather than the one stored in ImageFlattenProcess
 
-if(indexFilamentPackage==0)
-    msgbox('Need to be in Filament Package for now.')
-    return;
-end
+% Parameters: 
+selected_channels = p.ChannelIndex;
+flatten_method_ind = p.method_ind;
+Gaussian_sigma = p.GaussFilterSigma;
 
+TimeFilterSigma = p.TimeFilterSigma;
+Sub_Sample_Num  = p.Sub_Sample_Num;
 
-% Find the process of segmentation mask refinement.
-nProcesses = numel(movieData.processes_);
-
-indexFlattenProcess = 0;
-for i = 1 : nProcesses
-    if(strcmp(movieData.processes_{i}.getName,'Image Flatten')==1)
-        indexFlattenProcess = i;
-        break;
-    end
-end
-
-if indexFlattenProcess==0
-    msgbox('Please set parameters for Image Flatten.')
-    return;
-end
-
-% with no input funparam, use the one the process has on its own
-if nargin < 2
-    paramsIn = [];
-    funParams = movieData.processes_{indexFlattenProcess}.funParams_;
-else
-    funParams = paramsIn;
-end
-
-selected_channels = funParams.ChannelIndex;
-flatten_method_ind = funParams.method_ind;
-Gaussian_sigma = funParams.GaussFilterSigma;
-
-TimeFilterSigma = funParams.TimeFilterSigma;
-Sub_Sample_Num  = funParams.Sub_Sample_Num;
-
-imageflattening_mode = funParams.imageflattening_mode;
+imageflattening_mode = p.imageflattening_mode;
 
 nFrame = movieData.nFrames_;
 
-% default image flateen output dir
-ImageFlattenProcessOutputDir = [movieData.outputDirectory_, filesep 'ImageFlatten'];
+ImageFlattenProcessOutputDir = p.OutputDirectory;
+currOutputDirectory = ImageFlattenProcessOutputDir;
 
-%%
-% user defined way is not working for the GUI interface part if a ML is
-% defined and applied setting to all of the movies, (which causes the
-% folder all changed into movie 1)
-
-% if(~isempty(funParams.outputDir))
-%     % if there is a user defined folder as output folder
-%     % definitely follow that
-%     ImageFlattenProcessOutputDir = funParams.outputDir;
-% else
-    % if there is no user defined, but there is a filamentanalysispackage
-    % and there is a defined folder for the package, append for that.
-    if (indexFilamentPackage>0)
-        % and a directory is defined for this package
-        if (~isempty(movieData.packages_{indexFilamentPackage}.outputDirectory_))
-            % and this directory exists
-            if (~exist(movieData.packages_{indexFilamentPackage}.outputDirectory_,'dir'))
-                mkdir(movieData.packages_{indexFilamentPackage}.outputDirectory_);
-            end
-            ImageFlattenProcessOutputDir  = [movieData.packages_{indexFilamentPackage}.outputDirectory_, filesep 'ImageFlatten'];
-        end
-    end
-% end
-
-if (~exist(ImageFlattenProcessOutputDir,'dir'))
-    mkdir(ImageFlattenProcessOutputDir);
+% Sanity Checks
+nChan = numel(movieData.channels_);
+if max(p.ChannelIndex) > nChan || min(p.ChannelIndex)<1 || ~isequal(round(p.ChannelIndex), p.ChannelIndex)
+    error('Invalid channel numbers specified! Check ChannelIndex input!!')
 end
 
-for iChannel = selected_channels
-    ImageFlattenChannelOutputDir = [ImageFlattenProcessOutputDir,filesep,'Channel',num2str(iChannel)];
-    if (~exist(ImageFlattenChannelOutputDir,'dir'))
-        mkdir(ImageFlattenChannelOutputDir);
-    end
-    movieData.processes_{indexFlattenProcess}.setOutImagePath(iChannel,ImageFlattenChannelOutputDir);
-
-    output_dir_content = dir(fullfile([ImageFlattenChannelOutputDir,filesep,'*.*']));
-    
-    %if there are files in this dir, clear them
-    if(length(output_dir_content)>2)
-        delete([ImageFlattenChannelOutputDir,filesep,'*.*']);
-    end    
+% precondition / error checking
+% Find the package of Filament Analysis
+indexFilamentPackage = movieData.getPackageIndex('FilamentAnalysisPackage',1,true); % nDesired = 1 ; askUser = true
+if isempty(indexFilamentPackage)
+    error('Need to be in Filament Package for now.')
 end
+
+% logging input paths (bookkeeping)
+% ImageFlattenProcess uses the raw images as input
+inFilePaths = cell(1, numel(movieData.channels_));
+for i = p.ChannelIndex
+    inFilePaths{1,i} = movieData.getChannelPaths{i};
+end
+thisProc.setInFilePaths(inFilePaths);
+
+% logging output paths.
+dName = 'Channel';%String for naming the output directories for each channel
+mkClrDir(currOutputDirectory, false);
+outFilePaths = cell(1, numel(movieData.channels_));
+for iChan = p.ChannelIndex;
+    % Create string for current directory
+    currDir = [p.OutputDirectory filesep dName num2str(iChan)];
+    outFilePaths{1,iChan} = currDir;
+    mkClrDir(outFilePaths{1,iChan});
+end
+thisProc.setOutFilePaths(outFilePaths);
+
+
+%% Algorithm
+% see image_flatten.m line 104 and after
+
+% for most cases, don't do background removal here.
+background_removal_flag =0;
 
 for iChannel = selected_channels
     display('======================================');
@@ -126,12 +116,16 @@ for iChannel = selected_channels
 
     for_temporal_filtering = cell(1);
     
-    ImageFlattenProcessOutputDir = movieData.processes_{indexFlattenProcess}.outFilePaths_{iChannel};
-    
+    % ImageFlattenProcessOutputDir = movieData.processes_{indexFlattenProcess}.outFilePaths_{iChannel};
+    ImageFlattenChannelOutputDir = outFilePaths{1,iChannel}; % QZ
+
     % Get frame number from the title of the image, this not neccesarily
     % the same as iFrame due to some shorting problem of the channel
-    Channel_FilesNames = movieData.channels_(iChannel).getImageFileNames(1:movieData.nFrames_);
-    
+    % Channel_FilesNames = movieData.channels_(iChannel).getImageFileNames(1:movieData.nFrames_);
+    % QZ -- start
+    fileNamesF = movieData.getImageFileNames(iChannel); 
+    Channel_FilesNames = fileNamesF{1}; % this is the way to get fileNames which works for diff kinds images, including tiffs, bioFormats images
+    % QZ -- end
     filename_short_strs = uncommon_str_takeout(Channel_FilesNames);
     
     Frames_to_Seg = 1:Sub_Sample_Num:nFrame;
@@ -257,10 +251,15 @@ for iChannel = selected_channels
         center_value_int = mean((center_value_m1+center_value)/2);
         
         % record the stat numbers
-        funParams.stat.low_005_percentile = low_005_percentile;
-        funParams.stat.high_995_percentile = high_995_percentile;
-        funParams.stat.center_value_int = center_value_int;
-        
+        % funParams.stat.low_005_percentile = low_005_percentile;
+        % funParams.stat.high_995_percentile = high_995_percentile;
+        % funParams.stat.center_value_int = center_value_int;
+        % QZ I do not think those stat are saved somewhere -- start
+        p.stat.low_005_percentile = low_005_percentile;
+        p.stat.high_995_percentile = high_995_percentile;
+        p.stat.center_value_int = center_value_int;
+        % QZ -- end
+
         center_value = center_value/max(center_value);
         center_value = sqrt(center_value);
         center_value = imfilter(center_value,[1 2 3 9 3 2 1]/21,'replicate','same');
@@ -281,12 +280,11 @@ for iChannel = selected_channels
     
     %%
         
-    % Make output directory for the flattened images
-    ImageFlattenChannelOutputDir = movieData.processes_{indexFlattenProcess}.outFilePaths_{iChannel};
-    if (~exist(ImageFlattenChannelOutputDir,'dir'))
-        mkdir(ImageFlattenChannelOutputDir);
-    end
-    
+    % % Make output directory for the flattened images
+    % ImageFlattenChannelOutputDir = movieData.processes_{indexFlattenProcess}.outFilePaths_{iChannel};
+    % if (~exist(ImageFlattenChannelOutputDir,'dir'))
+    %     mkdir(ImageFlattenChannelOutputDir);
+    % end
     
     %%
     display('======================================');
@@ -441,7 +439,7 @@ for iChannel = selected_channels
     end
     
     %% if background removal is needed
-    if background_removal_flag==1
+    if background_removal_flag==1 % QZ this part is never called
         disp('Image Flattening in background removal:');
         
         tic
@@ -490,6 +488,8 @@ for iChannel = selected_channels
     %%
     % this the end of "for" of each channel
 end
+%%%% end of algorithm
 
-movieData.sanityCheck();
+fprintf('\n Finished Image Flatten Process! \n')
 
+end

@@ -41,7 +41,7 @@ classdef ImageFlattenProcess < ImageProcessingProcess
                 % Define arguments for superclass constructor
                 super_args{1} = owner;
                 super_args{2} = ImageFlattenProcess.getName;
-                super_args{3} = @image_flatten;
+                super_args{3} = @image_flatten_new; % edited 2024-10. The wrapper fcn was image_flatten.
                 if isempty(funParams)
                     funParams = ImageFlattenProcess.getDefaultParams(owner);
                 end
@@ -186,7 +186,7 @@ classdef ImageFlattenProcess < ImageProcessingProcess
             
             ImageFlattenChannelOutputDir = obj.outFilePaths_{iChan};
     
-            Channel_FilesNames = obj.getInImageFileNames(iChan);
+            Channel_FilesNames = obj.getOutImageFileNames(iChan);
             filename_short_strs = uncommon_str_takeout(Channel_FilesNames{1});
             
             % this line in commandation for shortest version of filename
@@ -195,7 +195,7 @@ classdef ImageFlattenProcess < ImageProcessingProcess
             currentImg=[];
             
             try
-                currentImg = imread([ImageFlattenChannelOutputDir,filesep,'flatten_', ...
+                currentImg = imread([ImageFlattenChannelOutputDir,filesep, ...
                     filename_short_strs{iFrame},'.tif']);
             catch
                 try
@@ -285,12 +285,13 @@ classdef ImageFlattenProcess < ImageProcessingProcess
             % Input check
             ip=inputParser;
             ip.addRequired('owner',@(x) isa(x,'MovieData'));
-%             ip.addOptional('outputDir',owner.outputDirectory_,@ischar);
+            ip.addOptional('outputDir',owner.outputDirectory_, @ischar);
             ip.parse(owner, varargin{:})
-%             outputDir=ip.Results.outputDir;
+            outputDir = ip.Results.outputDir;
             
             % Set default parameters
             funParams.ChannelIndex = 1:numel(owner.channels_);
+            funParams.OutputDirectory = [outputDir  filesep 'ImageFlatten']; % Added 2024-10 to fix folder icon issue on packageGUI
 %             funParams.outputDir = outputDir;
             funParams.method_ind = 3;
             funParams.imageflattening_mode = 2;
