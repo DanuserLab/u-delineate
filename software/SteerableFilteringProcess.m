@@ -33,6 +33,7 @@ classdef SteerableFilteringProcess < ImageProcessingProcess
                 ip = inputParser;
                 ip.addRequired('owner',@(x) isa(x,'MovieData'));
                 ip.addOptional('outputDir',owner.outputDirectory_,@ischar);
+
                 ip.addOptional('funParams',[],@isstruct);
                 ip.parse(owner,varargin{:});
                 outputDir = ip.Results.outputDir;
@@ -41,7 +42,7 @@ classdef SteerableFilteringProcess < ImageProcessingProcess
                 % Define arguments for superclass constructor
                 super_args{1} = owner;
                 super_args{2} = SteerableFilteringProcess.getName;
-                super_args{3} = @steerable_filter_forprocess;
+                super_args{3} = @steerable_filter_forprocess_new;
                 if isempty(funParams)
                     funParams = SteerableFilteringProcess.getDefaultParams(owner,outputDir);
                 end
@@ -176,7 +177,8 @@ classdef SteerableFilteringProcess < ImageProcessingProcess
             ip.parse(iChan,iFrame,varargin{:})
             
             % Data loading
-            Channel_FilesNames = obj.getInImageFileNames(iChan);
+            % Channel_FilesNames = obj.getInImageFileNames(iChan);
+            Channel_FilesNames = obj.owner_.getImageFileNames(iChan); % QZ this is how the output was save in wrapper fcn.
             filename_short_strs = uncommon_str_takeout(Channel_FilesNames{1});
             
             % this line in commandation for shortest version of filename
@@ -322,9 +324,11 @@ classdef SteerableFilteringProcess < ImageProcessingProcess
             % Set default parameters
             
             funParams.ChannelIndex = 1:numel(owner.channels_);
+            % HW: resolving error when opening output folder result
+            funParams.OutputDirectory = [outputDir filesep 'SteerableFiltering']; 
             funParams.Levelsofsteerablefilters = 2;
             funParams.BaseSteerableFilterSigma = 1;
-            funParams.ImageFlattenFlag = 2;
+            funParams.ImageFlattenFlag = 2; % 1 is to use original raw images; 2 is to use flatten images. Default is 2.
             % sub-sample number, since often VIF images are taken at a
             % lower sample rate than the other channel, so use this number
             % to save some time.

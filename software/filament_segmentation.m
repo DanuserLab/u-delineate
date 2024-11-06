@@ -781,28 +781,29 @@ for iChannel = selected_channels
         MaskCell=MaskCell>0;
         current_seg = current_seg.*MaskCell;
         
-         if ~strcmp(Combine_Way,'int_only')
-       
-        %%
-        % A smoothing done only at the steerable filtering results, if only intensity only, then the same
-        orienation_map_filtered = OrientationSmooth(orienation_map, SteerabelRes_Segment);
-        
-        %%
-        % % Voting of the orientation field for the non-steerable filter
-        % % segmented places.
-        
-        % % the voting is not in use
-        % OrientationVoted = OrientationVote(orienation_map,SteerabelRes_Segment,3,45);
-        OrientationVoted= orienation_map_filtered;
-        
-        intensity_addon = current_seg - SteerabelRes_Segment ==1;
-        if (~isempty(max(max(intensity_addon))>0))
-            orienation_map_filtered(find(intensity_addon>0)) = OrientationVoted(find(intensity_addon>0));
+        if ~strcmp(Combine_Way,'int_only')
+
+            %%
+            % A smoothing done only at the steerable filtering results, if only intensity only, then the same
+            orienation_map_filtered = OrientationSmooth(orienation_map, SteerabelRes_Segment);
+
+            %%
+            % % Voting of the orientation field for the non-steerable filter
+            % % segmented places.
+
+            % % the voting is not in use
+            % OrientationVoted = OrientationVote(orienation_map,SteerabelRes_Segment,3,45);
+            OrientationVoted= orienation_map_filtered;
+
+            intensity_addon = current_seg - SteerabelRes_Segment ==1;
+            % if (~isempty(max(max(intensity_addon))>0))
+            if any(max(max(intensity_addon))>0) % error fixed, QZ Nov 2024
+                orienation_map_filtered(find(intensity_addon>0)) = OrientationVoted(find(intensity_addon>0));
+            end
+        else
+            orienation_map_filtered = ones(size(current_seg));
+            nms = zeros(size(current_seg));
         end
-         else
-             orienation_map_filtered = ones(size(current_seg));
-             nms = zeros(size(current_seg));
-         end
          
         if(~strcmp(Combine_Way,'geo_based'))
             % if the segmentation is not done with geo_based method, do

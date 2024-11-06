@@ -43,7 +43,7 @@ classdef ImageFlattenProcess < ImageProcessingProcess
                 super_args{2} = ImageFlattenProcess.getName;
                 super_args{3} = @image_flatten_new; % edited 2024-10. The wrapper fcn was image_flatten.
                 if isempty(funParams)
-                    funParams = ImageFlattenProcess.getDefaultParams(owner);
+                    funParams = ImageFlattenProcess.getDefaultParams(owner,outputDir); % Added outputDir here so the result folder is saved in the package's folder. - QZ Nov 2024
                 end
                 super_args{4} = funParams;
                 
@@ -186,7 +186,7 @@ classdef ImageFlattenProcess < ImageProcessingProcess
             
             ImageFlattenChannelOutputDir = obj.outFilePaths_{iChan};
     
-            Channel_FilesNames = obj.getOutImageFileNames(iChan);
+            Channel_FilesNames = obj.getOutImageFileNames(iChan); % Use output images file names instead of input image file names, to fixed the bug if  BioFormats data as input. - Qiongjing (Jenny) Zou, Nov 2024
             filename_short_strs = uncommon_str_takeout(Channel_FilesNames{1});
             
             % this line in commandation for shortest version of filename
@@ -195,11 +195,11 @@ classdef ImageFlattenProcess < ImageProcessingProcess
             currentImg=[];
             
             try
-                currentImg = imread([ImageFlattenChannelOutputDir,filesep, ...
+                currentImg = imread([ImageFlattenChannelOutputDir,filesep, ... 
                     filename_short_strs{iFrame},'.tif']);
             catch
                 try
-                currentImg = imread([ImageFlattenChannelOutputDir,filesep,'flatten_', ...
+                currentImg = imread([ImageFlattenChannelOutputDir,filesep, ...
                     filename_shortshort_strs{iFrame},'.tif']);
                 catch
                     if(iFrame==1)

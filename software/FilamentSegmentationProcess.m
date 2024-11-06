@@ -179,7 +179,8 @@ classdef FilamentSegmentationProcess < ImageProcessingProcess
             ip.parse(iChan,iFrame,varargin{:})
             
             % Data loading
-            Channel_FilesNames = obj.getInImageFileNames(iChan);
+            % Channel_FilesNames = obj.getInImageFileNames(iChan);
+            Channel_FilesNames = obj.owner_.getImageFileNames(iChan); % QZ this is how the output was save in wrapper fcn.
             filename_short_strs = uncommon_str_takeout(Channel_FilesNames{1});
             
             % this line in commandation for shortest version of filename
