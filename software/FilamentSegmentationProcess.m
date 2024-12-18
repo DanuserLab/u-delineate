@@ -41,7 +41,7 @@ classdef FilamentSegmentationProcess < ImageProcessingProcess
                 % Define arguments for superclass constructor
                 super_args{1} = owner;
                 super_args{2} = FilamentSegmentationProcess.getName;
-                super_args{3} = @filament_segmentation;
+                super_args{3} = @filament_segmentation_new;
                 if isempty(funParams)
                     funParams = FilamentSegmentationProcess.getDefaultParams(owner,outputDir);
                 end
@@ -342,6 +342,8 @@ classdef FilamentSegmentationProcess < ImageProcessingProcess
             % Set default channels, use all channels
             funParams.ChannelIndex = 1:numel(owner.channels_);
             
+            funParams.OutputDirectory = [outputDir filesep 'FilamentSegmentation'];
+
             % The parameter to set pace in local segmentation
             funParams.StPace_Size = 3;
             % The parameter to set patch size in local segmentation, for
@@ -436,6 +438,7 @@ classdef FilamentSegmentationProcess < ImageProcessingProcess
             % Flag to enable and disable (default) the filament drawing on the figures in each loop while the process is running
             % Added by Qiongjing (Jenny) Zou
             funParams.enableFilamentDrawing = false; % when it is true, then the process is very slow.
+           
         end
     end
 end

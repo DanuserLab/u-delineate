@@ -1,5 +1,26 @@
-function movieData = filament_segmentation(movieData, paramsIn, wholemovie_input_filename, varargin)
-% Main function for the segmentation/reconstruction step in filament analysis
+function filament_segmentation_new(movieDataOrProcess, varargin)
+% FilamentSegmentationProcess wrapper function for FilamentSegmentationProcess.
+%
+% Input:
+% movieDataOrProcess:        movieData or Process object
+% param:                     (optional) A struct describing the parameters, overrides the
+%                            parameters stored in the process (as of Aug 2016)
+% wholemovie_input_filename: (optional) the filename of mat file previously saved for the whole movie statistics for this or some other
+%                            movie. If given, this will overwrite the wholemovie statistics that comes with the movieData
+% OUTPUT
+% none (saved to p.OutputDirectory)
+%
+% Changes
+% As of July 2016, the first argument could also be a Process. Use
+% getOwnerAndProcess to simplify compatability.
+%
+% As of August 2016, the standard second argument should be the parameter
+% structure
+%
+%
+% This wrapper fcn was written based on filament_segmentation.m written by Liya Ding from 2015 or before.
+% The way filament_segmentation was written is outdated, and not compatible with features on packageGUI, etc.
+% Hillary Wong & Qiongjing (Jenny) Zou, December 2024
 %
 % Copyright (C) 2024, Danuser Lab - UTSouthwestern 
 %
@@ -20,245 +41,169 @@ function movieData = filament_segmentation(movieData, paramsIn, wholemovie_input
 % 
 % 
 
-% Input:    
-% movieData:  movieData object, with the parameters
-% paramsIn:   the parameters to use, if given, overlay
-%             the funParams that comes with movieData. 
-%             Here are the fields
-%             {
-%               .ChannelIndex:                  the channels to process
-%               .Pace_Size:                     the parameter to set pace in local segmentation
-%               .Patch_Size:                    the parameter to set patch size in local segmentation, for the estimation of local threshold
-%               .lowerbound_localthresholding:  The percentage as the lower bound of local thresholding
-%                                                   local threshold has to be larger or equal to this percentage of the global threshold
-%               .Combine_Way :                  The way to combine segmentation results from steerable filtering responce
-%                                                   and from intensity, default is : only use steerable filtering result
-%               .Cell_Mask_ind:                 Flag to set if cell mask is used, if 1, use segmentation(refined) results,
-%                                                   if 2, use the user define ROI as in MD_ROI.tif in movieData folder, if 3, no such limit
-%               .VIF_Outgrowth_Flag:   Flag to do VIF_outgrowth or not. This is an option made for Gelfand lab
-%             }
-%
-% wholemovie_input_filename: the filename of mat file previously saved for the
-%                            whole movie statistics for this or some other
-%                            movie. If given, this will overwrite the
-%                            wholemovie statistics that comes with the
-%                            movieData
+%% ------------------ Input ---------------- %%
+ip = inputParser;
+ip.addRequired('MD', @(x) isa(x,'MovieData') || isa(x,'Process') && isa(x.getOwner(),'MovieData'));
+ip.addOptional('paramsIn',[], @isstruct);
+ip.addOptional('wholemovie_input_filename', '', @(x) isstring(x) && endsWith(x, '.mat'));
+ip.parse(movieDataOrProcess, varargin{:});
+paramsIn = ip.Results.paramsIn;
+wholemovie_input_filename = ip.Results.wholemovie_input_filename;
 
-%Output:    
-% movieData:   updated movieData object. With the segmentation
-%                   resulting images saved to the hard disk with corresponing locations.
+%% Registration
+% Get MovieData object and Process
+[movieData, thisProc] = getOwnerAndProcess(movieDataOrProcess, 'FilamentSegmentationProcess', true);
+p = parseProcessParams(thisProc, paramsIn); % If parameters are explicitly given, they should be used
+% rather than the one stored in FilamentSegmentationProcess
 
-% Created 07 2012 by Liya Ding, Matlab R2011b
+%% Parameters:
 
-%% Data Preparation
+selected_channels = p.ChannelIndex;
 
-% before even looking at the nargin, check for the condition and indices
-% for the different packages.
+StPace_Size_movie = p.StPace_Size;
+StPatch_Size_movie = p.StPatch_Size;
+st_lowerbound_localthresholding_movie =  p.st_lowerbound_localthresholding;
+IntPace_Size_movie = p.IntPace_Size;
+IntPatch_Size_movie = p.IntPatch_Size;
+int_lowerbound_localthresholding_movie =  p.int_lowerbound_localthresholding;
 
-% a temp flag for saving tif stack image for Gelfand Lab
-save_tif_flag=1;
+Combine_Way_movie = p.Combine_Way;
+Cell_Mask_ind_movie = p.Cell_Mask_ind;
+VIF_Outgrowth_Flag_movie = p.VIF_Outgrowth_Flag;
+Sub_Sample_Num_movie  = p.Sub_Sample_Num;
+Whole_movie_ind_movie  = p.Whole_movie_ind;
+Rerun_WholeMovie =  p.Rerun_WholeMovie;
 
-% Find the package of Filament Analysis
-nPackage = length(movieData.packages_);
+SaveFigures_movie = p.savestepfigures;
+ShowDetailMessages_movie = p.savestepfigures;
+saveallresults_movie = p.savestepfigures;
 
-indexFilamentPackage = 0;
-for i = 1 : nPackage
-    if(isequal(class(movieData.packages_{i}),'FilamentAnalysisPackage'))
-        indexFilamentPackage = i;
-        break;
-    end
-end
-
-if(indexFilamentPackage==0)
-    msgbox('Need to be in Filament Package for now.')
-    return;
-end
-
-nProcesses = length(movieData.processes_);
-
-indexFilamentSegmentationProcess = 0;
-for i = 1 : nProcesses
-    if(strcmp(movieData.processes_{i}.getName,'Filament Segmentation')==1)
-        indexFilamentSegmentationProcess = i;
-        break;
-    end
-end
-
-if indexFilamentSegmentationProcess==0
-    msgbox('Please set parameters for steerable filtering.')
-    return;
-end
-
-
-% with no input funparam, use the one the process has on its own
-if nargin < 2
-    paramsIn = [];
-    funParams = movieData.processes_{indexFilamentSegmentationProcess}.funParams_;
-else
-    funParams = paramsIn;
-end
-
-
-selected_channels = funParams.ChannelIndex;
-
-StPace_Size_movie = funParams.StPace_Size;
-StPatch_Size_movie = funParams.StPatch_Size;
-st_lowerbound_localthresholding_movie =  funParams.st_lowerbound_localthresholding;
-IntPace_Size_movie = funParams.IntPace_Size;
-IntPatch_Size_movie = funParams.IntPatch_Size;
-int_lowerbound_localthresholding_movie =  funParams.int_lowerbound_localthresholding;
-
-Combine_Way_movie = funParams.Combine_Way;
-Cell_Mask_ind_movie = funParams.Cell_Mask_ind;
-VIF_Outgrowth_Flag_movie = funParams.VIF_Outgrowth_Flag;
-Sub_Sample_Num_movie  = funParams.Sub_Sample_Num;
-Whole_movie_ind_movie  = funParams.Whole_movie_ind;
-Rerun_WholeMovie =  funParams.Rerun_WholeMovie;
-
-SaveFigures_movie = funParams.savestepfigures;
-ShowDetailMessages_movie = funParams.savestepfigures;
-saveallresults_movie = funParams.savestepfigures;
-
-CoefAlpha_movie = funParams.CoefAlpha;
-LengthThreshold_movie = funParams.LengthThreshold;
-IternationNumber_movie = funParams.IternationNumber;
-CurvatureThreshold_movie = funParams.CurvatureThreshold;
+CoefAlpha_movie = p.CoefAlpha;
+LengthThreshold_movie = p.LengthThreshold;
+IternationNumber_movie = p.IternationNumber;
+CurvatureThreshold_movie = p.CurvatureThreshold;
 Cell_Mask_ind = Cell_Mask_ind_movie;
-Combine_Way = funParams.Combine_Way;
-   
+Combine_Way = p.Combine_Way;
+
 % if the package was run with old version with only one set of parameter
 % for all channels, make a copy of parameter to every channel
-if(length(funParams.StPace_Size)==1 && numel(movieData.channels_)>1)
+if(length(p.StPace_Size)==1 && numel(movieData.channels_)>1)
     ones_array = ones(1,numel(movieData.channels_));
-    funParams.StPace_Size = funParams.StPace_Size*ones_array;
-    funParams.StPatch_Size = funParams.StPatch_Size*ones_array;
-    funParams.st_lowerbound_localthresholding = funParams.st_lowerbound_localthresholding*ones_array;
-    funParams.IntPace_Size = funParams.IntPace_Size*ones_array;
-    funParams.IntPatch_Size = funParams.IntPatch_Size*ones_array;
-    funParams.int_lowerbound_localthresholding = funParams.int_lowerbound_localthresholding*ones_array;
-    funParams.Cell_Mask_ind = funParams.Cell_Mask_ind*ones_array;
-    funParams.Whole_movie_ind = funParams.Whole_movie_ind*ones_array;
-    
-    Combine_Way = funParams.Combine_Way;
-    
-    funParams.Combine_Way=cell(1,1);
-    
+    p.StPace_Size = p.StPace_Size*ones_array;
+    p.StPatch_Size = p.StPatch_Size*ones_array;
+    p.st_lowerbound_localthresholding = p.st_lowerbound_localthresholding*ones_array;
+    p.IntPace_Size = p.IntPace_Size*ones_array;
+    p.IntPatch_Size = p.IntPatch_Size*ones_array;
+    p.int_lowerbound_localthresholding = p.int_lowerbound_localthresholding*ones_array;
+    p.Cell_Mask_ind = p.Cell_Mask_ind*ones_array;
+    p.Whole_movie_ind = p.Whole_movie_ind*ones_array;
+
+    Combine_Way = p.Combine_Way;
+
+    p.Combine_Way=cell(1,1);
+
     for iC = 1 : numel(movieData.channels_)
-        funParams.Combine_Way{iC}= Combine_Way;
+        p.Combine_Way{iC}= Combine_Way;
     end
-    
-    funParams.Classifier_Type_ind = funParams.Classifier_Type_ind*ones_array;
-    funParams.LengthThreshold = funParams.LengthThreshold*ones_array;
-    funParams.CurvatureThreshold = funParams.CurvatureThreshold*ones_array;
-    funParams.IternationNumber = funParams.IternationNumber*ones_array;
-    funParams.CoefAlpha = funParams.CoefAlpha*ones_array;
-    funParams.training_sample_number = funParams.training_sample_number*ones_array;
+
+    p.Classifier_Type_ind = p.Classifier_Type_ind*ones_array;
+    p.LengthThreshold = p.LengthThreshold*ones_array;
+    p.CurvatureThreshold = p.CurvatureThreshold*ones_array;
+    p.IternationNumber = p.IternationNumber*ones_array;
+    p.CoefAlpha = p.CoefAlpha*ones_array;
+    p.training_sample_number = p.training_sample_number*ones_array;
 end
 
+nFrame = movieData.nFrames_;
 
-%% Output Directories
+% Retrieve output directory from funParams/p
+FilamentSegmentationProcessOutputDir = p.OutputDirectory;
+currOutputDirectory = FilamentSegmentationProcessOutputDir;
 
-% default steerable filter process output dir
-FilamentSegmentationProcessOutputDir = [movieData.outputDirectory_, filesep 'FilamentSegmentation'];
-
-% if there is filamentanalysispackage
-if (indexFilamentPackage>0)
-    % and a directory is defined for this package
-    if (~isempty(movieData.packages_{indexFilamentPackage}.outputDirectory_))
-        % and this directory exists
-        if (exist(movieData.packages_{indexFilamentPackage}.outputDirectory_,'dir'))
-            FilamentSegmentationProcessOutputDir  = [movieData.packages_{indexFilamentPackage}.outputDirectory_, filesep 'FilamentSegmentation'];
-        end
-    end
-end
-
-if (~exist(FilamentSegmentationProcessOutputDir,'dir'))
-    try
-        mkdir(FilamentSegmentationProcessOutputDir);
-    catch
-        system(['mkdir -p ' FilamentSegmentationProcessOutputDir]);
-    end
-end
-
-for iChannel = selected_channels
-    FilamentSegmentationChannelOutputDir = [FilamentSegmentationProcessOutputDir,filesep,'Channel',num2str(iChannel)];
-    if (~exist(FilamentSegmentationChannelOutputDir,'dir'))
-        try
-            mkdir(FilamentSegmentationChannelOutputDir);
-        catch
-            system(['mkdir -p ' FilamentSegmentationChannelOutputDir]);
-        end
-    end
-    
-    movieData.processes_{indexFilamentSegmentationProcess}.setOutImagePath(iChannel,FilamentSegmentationChannelOutputDir);
-end
+%temp flag for Gelfand Lab
+save_tif_flag = 1; % QZ: this param is not in FilamentSegmentationProcess, and the tifs are saved in the algorithm
 
 
 %%
-indexSteerabeleProcess = 0;
-for i = 1 : nProcesses
-    if(strcmp(movieData.processes_{i}.getName,'Steerable filtering')==1)
-        indexSteerabeleProcess = i;
-        break;
+% Sanity Checks
+nChan = numel(movieData.channels_);
+if max(p.ChannelIndex) > nChan || min(p.ChannelIndex)<1 || ~isequal(round(p.ChannelIndex), p.ChannelIndex)
+    error('Invalid channel numbers specified! Check ChannelIndex input!!')
+end
+
+% precondition / error checking
+% see filament_segmentation.m line 42 - 56 and line 179 - 238
+% Find the package of Filament Analysis
+indexFilamentPackage = movieData.getPackageIndex('FilamentAnalysisPackage',1,true); % nDesired = 1 ; askUser = true
+if isempty(indexFilamentPackage)
+    error('Need to be in Filament Package for now.')
+end
+
+% Find SteerableFilteringProcess
+indexSteerableProcess = movieData.getProcessIndex('SteerableFilteringProcess');
+if (isempty(indexSteerableProcess) && ~strcmp(Combine_Way{1}, 'int_only'))
+    error("Please run steerable filtering first.")
+end
+if ~isempty(indexSteerableProcess)
+    % retrieve parameters set by indexSteerable Process
+    funParams_st=movieData.processes_{indexSteerableProcess}.funParams_;
+
+    BaseSteerableFilterSigma = funParams_st.BaseSteerableFilterSigma;
+    Levelsofsteerablefilters = funParams_st.Levelsofsteerablefilters;
+    ImageFlattenFlag = funParams_st.ImageFlattenFlag;
+end
+
+% Find ImageFlattenProcess
+indexFlattenProcess = movieData.getProcessIndex('ImageFlattenProcess');
+if isempty(indexFlattenProcess) && ImageFlattenFlag == 2
+    error("Please set parameters for Image Flatten.")
+end
+
+% Find SegmentationProcess. Make sure the movie has been segmented
+indexCellSegSegProcess = movieData.getProcessIndex('SegmentationProcess',1,true); % nDesired = 1 ; askUser = true
+if isempty(indexCellSegSegProcess)
+    error("Please run segmentation first.")
+end
+
+% Find MaskRefinementProcess
+indexCellRefinementProcess = movieData.getProcessIndex('MaskRefinementProcess');
+if isempty(indexCellRefinementProcess) && (Cell_Mask_ind(1) == 1 || Cell_Mask_ind(1) == 3 || Cell_Mask_ind(1) == 4 || Cell_Mask_ind(1) == 6)
+    error("Please run segmentation and refinement first.")
+end
+
+%%
+% logging input paths (bookkeeping)
+% FilamentSegmentationProcess uses the output of ImageFlattenProcess, if ImageFlattenFlag from SteerableFilteringProcess is 2, otherwise uses the raw images as input.
+inFilePaths = cell(1, numel(movieData.channels_));
+for i = p.ChannelIndex
+    if ~isempty(indexSteerableProcess) && ~isempty(indexFlattenProcess) && ImageFlattenFlag == 2
+        inFilePaths{1,i} = movieData.processes_{indexFlattenProcess}.outFilePaths_{1,i};
+    else
+        inFilePaths{1,i} = movieData.getChannelPaths{i};    
     end
 end
+thisProc.setInFilePaths(inFilePaths);
 
-if indexSteerabeleProcess==0 && ~strcmp(Combine_Way{1},'int_only')
-   msgbox('Please run steerable filtering first.')
-    return;
+% logging output paths.
+dName = 'Channel';%String for naming the output directories for each channel
+mkClrDir(currOutputDirectory, false);
+outFilePaths = cell(1, numel(movieData.channels_));
+for iChan = p.ChannelIndex
+    % Create string for current directory
+    currDir = [p.OutputDirectory filesep dName num2str(iChan)];
+    outFilePaths{1,iChan} = currDir;
+    mkClrDir(outFilePaths{1,iChan});
 end
-
-funParams_st=movieData.processes_{indexSteerabeleProcess}.funParams_;
-
-BaseSteerableFilterSigma = funParams_st.BaseSteerableFilterSigma;
-Levelsofsteerablefilters = funParams_st.Levelsofsteerablefilters;
-ImageFlattenFlag = funParams_st.ImageFlattenFlag;
-
-indexFlattenProcess = 0;
-for i = 1 : nProcesses
-    if(strcmp(movieData.processes_{i}.getName,'Image Flatten')==1)
-        indexFlattenProcess = i;
-        break;
-    end
-end
-
-if indexFlattenProcess == 0 && ImageFlattenFlag==2
-    display('Please set parameters for Image Flatten.')
-    return;
-end
+thisProc.setOutFilePaths(outFilePaths);
 
 
-indexCellSegSegProcess = 0;
-for i = 1 : nProcesses
-    if(strcmp(movieData.processes_{i}.getName,'Thresholding')==1)
-        indexCellSegSegProcess = i;
-        break;
-    end
-end
-
-if indexCellSegSegProcess == 0
-         disp('Please run segmentation and refinement first.');  
-    %     return;
-end
-
-
-indexCellRefinementProcess = 0;
-for i =  nProcesses:(-1):1
-    if(strcmp(movieData.processes_{i}.getName,'Mask Refinement')==1)
-        indexCellRefinementProcess = i;
-        break;
-    end
-end
-
-if indexCellRefinementProcess == 0 && (Cell_Mask_ind(1) == 1 || Cell_Mask_ind(1) == 3 || Cell_Mask_ind(1) == 4 || Cell_Mask_ind(1) == 6)
-    msgbox('Please run segmentation and refinement first.')
-    return;
-end
+%% Algorithm
+% see filament_segmentation.m line 240 and after
 
 % if user want to use an input whole movie stat result, use it
-if nargin >=3
-    load(wholemovie_input_filename);
-    funParams.Whole_movie_stat_cell = Whole_movie_stat_cell;
+if ~isempty(wholemovie_input_filename)
+    load(wholemovie_input_filename); % QZ: this is problematic if wholemovie_input_filename file is in current path.
+    p.Whole_movie_stat_cell = Whole_movie_stat_cell;
 else
     
     if ~strcmp(Combine_Way{1},'int_only')
@@ -301,12 +246,10 @@ else
         save([FilamentSegmentationProcessOutputDir, filesep, 'whole_movie_stat.mat'],'Whole_movie_stat_cell');
     end
     
-    funParams.Whole_movie_stat_cell = Whole_movie_stat_cell;
+    p.Whole_movie_stat_cell = Whole_movie_stat_cell;
     end
 end
 
-%%
-nFrame = movieData.nFrames_;
 
 % If the user set an cell ROI read in
 if(exist([movieData.outputDirectory_,filesep,'MD_ROI.tif'],'file'))
@@ -383,22 +326,29 @@ for iChannel = selected_channels
         Combine_Way = Combine_Way_movie;
         Cell_Mask_ind = Cell_Mask_ind_movie;
     end
-    
+
     VIF_Outgrowth_Flag = VIF_Outgrowth_Flag_movie;
     Sub_Sample_Num  = Sub_Sample_Num_movie;
     
     
     % Get frame number from the title of the image, this not neccesarily
     % the same as iFrame due to some shorting problem of the channel
-    Channel_FilesNames = movieData.channels_(iChannel).getImageFileNames(1:movieData.nFrames_);
+    % Channel_FilesNames = movieData.channels_(iChannel).getImageFileNames(1:movieData.nFrames_);
+    % QZ -- start
+    fileNamesF = movieData.getImageFileNames(iChannel);
+    Channel_FilesNames = fileNamesF{1}; % this is the way to get fileNames which works for diff kinds images, including tiffs, bioFormats images
+    % QZ -- end
     
     filename_short_strs = uncommon_str_takeout(Channel_FilesNames);
     
     % Make output directory for the steerable filtered images
-    FilamentSegmentationChannelOutputDir =  movieData.processes_{indexFilamentSegmentationProcess}.outFilePaths_{iChannel};
-    if (~exist(FilamentSegmentationChannelOutputDir,'dir'))
-        mkdir(FilamentSegmentationChannelOutputDir);
-    end
+    % FilamentSegmentationChannelOutputDir =  movieData.processes_{indexFilamentSegmentationProcess}.outFilePaths_{iChannel};
+    FilamentSegmentationChannelOutputDir = outFilePaths{1,iChannel}; % QZ
+
+    % this part was done in logging output paths. - QZ
+    % if (~exist(FilamentSegmentationChannelOutputDir,'dir'))
+    %     mkdir(FilamentSegmentationChannelOutputDir);
+    % end
     
     HeatOutputDir = [FilamentSegmentationChannelOutputDir,filesep,'HeatOutput'];
     
@@ -411,7 +361,7 @@ for iChannel = selected_channels
     if (~exist(HeatEnhOutputDir,'dir'))
         mkdir(HeatEnhOutputDir);
     end
-    
+
     DataOutputDir = [FilamentSegmentationChannelOutputDir,filesep,'DataOutput'];
     
     if (~exist(DataOutputDir,'dir'))
@@ -427,8 +377,8 @@ for iChannel = selected_channels
     end
         
     % If steerable filter process is run
-    if indexSteerabeleProcess>0
-        SteerableChannelOutputDir = movieData.processes_{indexSteerabeleProcess}.outFilePaths_{iChannel};
+    if indexSteerableProcess>0
+        SteerableChannelOutputDir = movieData.processes_{indexSteerableProcess}.outFilePaths_{iChannel};
     end
     
     %     if indexFlattenProcess >0
@@ -438,7 +388,8 @@ for iChannel = selected_channels
     display('======================================');
     display(['Current movie: as in ',movieData.outputDirectory_]);
     display(['Start filament segmentation in Channel ',num2str(iChannel)]);
-    
+
+
     % Segment only the real collected data, but skip the padded ones, which
     % were there just to fill in the time lap to make two channel same
     % number of frames
@@ -468,7 +419,7 @@ for iChannel = selected_channels
         %             tif_stack_RGB_heat_image_data = uint8(zeros(size(currentImg,1),size(currentImg,2),3,length(Frames_to_Seg)));
         %         end
         %%
-        
+
         % this line in commandation for shortest version of filename
         filename_shortshort_strs = all_uncommon_str_takeout(Channel_FilesNames{1});
         
@@ -534,7 +485,7 @@ for iChannel = selected_channels
                 end
             end
         end
-        
+
         if(isempty(MaskCell))
             continue;
         end
@@ -559,8 +510,8 @@ for iChannel = selected_channels
         
         
         %%
-        
-        
+
+
         NMS_Segment=[];
         Intensity_Segment=[];
         SteerabelRes_Segment=[];
@@ -616,15 +567,15 @@ for iChannel = selected_channels
                 
             case 'geo_based_training'
                 
-                if(~isempty(funParams.F_classifier{iChannel}))
-                    load(funParams.F_classifier{iChannel});
+                if(~isempty(p.F_classifier{iChannel}))
+                    load(p.F_classifier{iChannel});
                 else
                     F_classifer_train_this_channel=[];
                 end
                 
                 [level2, NMS_Segment,current_model ] = ...
                     geoBasedNmsSeg_withtraining(nms,currentImg, F_classifer_train_this_channel,1,...
-                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,funParams);
+                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,p);
                 current_seg = NMS_Segment;
                 Intensity_Segment = current_seg;
                 SteerabelRes_Segment = current_seg;
@@ -646,7 +597,7 @@ for iChannel = selected_channels
                         
                         [lowThresh, highThresh, current_seg]...
                             = proximityBasedNmsSeg(MAX_st_res,...
-                            orienation_map,funParams,...
+                            orienation_map,p,...
                             PercentOfPixelsNotEdges,ThresholdRatio);
                         current_seg_canny_cell{iP,iT} = current_seg;
                         
@@ -668,7 +619,7 @@ for iChannel = selected_channels
                 TIC_geoBased_GM = tic;
                 [level2, NMS_Segment,current_model ] = ...
                     geoBasedNmsSeg_withGM(nms,currentImg, F_classifer_train_this_channel,1,...
-                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,funParams,iChannel);
+                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,p,iChannel);
                 Time_cost = toc(TIC_geoBased_GM);
 %                 disp(['Frame ', num2str(iFrame), ' geoBased_GM costed ',num2str(Time_cost,'%.2f'),'s.']);
                 
@@ -687,7 +638,7 @@ for iChannel = selected_channels
                 TIC_geoBased_noGM = tic;
                 [level2, NMS_Segment,current_model ] = ...
                     geoBasedNmsSeg_withoutGM(nms,currentImg, F_classifer_train_this_channel,1,...
-                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,funParams,iChannel);
+                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,p,iChannel);
                 Time_cost = toc(TIC_geoBased_noGM);
 %                 disp(['Frame: ', num2str(iFrame), ' geoBased_noGM costed ',num2str(Time_cost),'s.']);                        
                 
@@ -711,7 +662,7 @@ for iChannel = selected_channels
                 TIC_geoBased_GM = tic;               
                 [level2, NMS_Segment,current_model ] = ...
                     geoBasedNmsSeg_withGM(nms,currentImg, F_classifer_train_this_channel,1,...
-                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,funParams,iChannel);
+                    MaskCell,iFrame,FilamentSegmentationChannelOutputDir,p,iChannel);
                 Time_cost = toc(TIC_geoBased_GM);
 %                 disp(['Frame ', num2str(iFrame), ' geoBased_GM costed ',num2str(Time_cost,'%.2f'),'s.']);
                 current_seg = NMS_Segment;
@@ -753,12 +704,12 @@ for iChannel = selected_channels
 %                 toc
                 
                 % get the percentage threshold from funParam
-                HigherThresdhold = funParams.CannyHigherThreshold(iChannel)/100;
-                LowerThresdhold = funParams.CannyLowerThreshold(iChannel)/100;
+                HigherThresdhold = p.CannyHigherThreshold(iChannel)/100;
+                LowerThresdhold = p.CannyLowerThreshold(iChannel)/100;
                 
 %                 tic
                 [lowThresh, highThresh, current_seg]...
-                    = proximityBasedNmsSeg(MAX_st_res,orienation_map,funParams,HigherThresdhold,LowerThresdhold);
+                    = proximityBasedNmsSeg(MAX_st_res,orienation_map,p,HigherThresdhold,LowerThresdhold);
 %                 toc
                 
                 level2 = highThresh;
@@ -777,7 +728,7 @@ for iChannel = selected_channels
                 current_seg = or(Intensity_Segment,SteerabelRes_Segment);
                 current_model=[];
         end
-        
+
         MaskCell=MaskCell>0;
         current_seg = current_seg.*MaskCell;
         
@@ -804,7 +755,7 @@ for iChannel = selected_channels
             orienation_map_filtered = ones(size(current_seg));
             nms = zeros(size(current_seg));
         end
-         
+
         if(~strcmp(Combine_Way,'geo_based'))
             % if the segmentation is not done with geo_based method, do
             % some geometry based checking on the results
@@ -856,7 +807,7 @@ for iChannel = selected_channels
             
             current_seg = labelMask > 0;
         end
-        
+
         %
         %         [ind_a,ind_b] = find(current_seg>0);
         %
@@ -911,7 +862,6 @@ for iChannel = selected_channels
             end
         end
         
-        
         if(~isempty(current_model))
             [Vif_digital_model,Vif_orientation_model,VIF_XX,VIF_YY,VIF_OO] ...
                 = filament_model_to_digital_with_orientation(current_model);
@@ -934,7 +884,7 @@ for iChannel = selected_channels
         Hue = (-orienation_map_filtered(:)+pi/2)/(pi)-0.2;
         Hue(find(Hue>=1)) = Hue(find(Hue>=1)) -1;
         Hue(find(Hue<0)) = Hue(find(Hue<0)) +1;
-        
+
         Sat = Hue*0+1;
         Value = Hue*0+1;
         RGB_seg_orient_heat_array = hsv2rgb([Hue Sat Value]);
@@ -953,8 +903,8 @@ for iChannel = selected_channels
         RGB_seg_orient_heat_map(:,:,1 ) = enhanced_im_r;
         RGB_seg_orient_heat_map(:,:,2 ) = enhanced_im_g;
         RGB_seg_orient_heat_map(:,:,3 ) = enhanced_im_b;
-        
-        
+
+
         for sub_i = 1 : Sub_Sample_Num
             if iFrame + sub_i-1 <= nFrame
                 imwrite(RGB_seg_orient_heat_map, ...
@@ -974,7 +924,7 @@ for iChannel = selected_channels
         RGB_seg_orient_heat_map(:,:,1 ) = enhanced_im_r;
         RGB_seg_orient_heat_map(:,:,2 ) = enhanced_im_g;
         RGB_seg_orient_heat_map(:,:,3 ) = enhanced_im_b;
-        
+
         if(SaveFigures_movie==1)
             for sub_i = 1 : Sub_Sample_Num
                 if iFrame + sub_i-1 <= nFrame
@@ -1014,7 +964,7 @@ for iChannel = selected_channels
 
             RGB_seg_orient_heat_map = RGB_seg_orient_heat_map_nms;
         end
-        
+
         current_seg_orientation = current_seg.*orienation_map_filtered;
         current_seg_orientation(find(current_seg==0)) = nan;
         end_points_map = bwmorph(current_seg,'endpoints');
@@ -1031,7 +981,8 @@ for iChannel = selected_channels
         if(~exist('current_seg_canny_cell','var'))
             current_seg_canny_cell=[];
         end
-        
+
+
         %% Save segmentation results
         for sub_i = 1 : Sub_Sample_Num
             if iFrame + sub_i-1 <= nFrame
@@ -1057,7 +1008,7 @@ for iChannel = selected_channels
             end
         end
 
-        
+
         %% %tif stack cost too much memory, comment these
         %         if( save_tif_flag==1)
         % %             current_seg = (imread([FilamentSegmentationChannelOutputDir,filesep,'segment_binary_',filename_short_strs{iFrame},'.tif']))>0;
@@ -1073,8 +1024,9 @@ for iChannel = selected_channels
         disp(['Frame ', num2str(iFrame), ' filament seg costed ',num2str(Time_cost,'%.2f'),'s.']);
 
     end
+
     %% For Gelfand Lab, save results as tif stack file
-    if( save_tif_flag==1)
+    if(save_tif_flag==1)
         options.comp = false;
         options.ask = false;
         options.message = true;
@@ -1087,10 +1039,8 @@ for iChannel = selected_channels
         %         saveastiff(tif_stack_binary_seg_image_data, [FilamentSegmentationProcessOutputDir,filesep,'channel_',num2str(iChannel),'_seg_binary.tif'], options);
         
     end
-    
+
 end
-
-
 
 %% For Gelfand Lab, outgrowth calculation
 if(VIF_Outgrowth_Flag==1)
@@ -1098,5 +1048,7 @@ if(VIF_Outgrowth_Flag==1)
 end
 
 
+%%%% end of algorithm
 
-
+fprintf('Finished Filament Segmentation Process! \n')
+end
