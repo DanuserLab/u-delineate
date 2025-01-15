@@ -7,7 +7,7 @@ function  F_classifer_train_output  = nms_classifier_train_moviedata(movieData,c
 %    F_classifer:                       trained classifiers for selected channels, one for each
 %
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

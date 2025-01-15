@@ -22,7 +22,7 @@ for i = radius+1 : size(DA_filter,1)-radius
 %         local_B_sm = imfilter(local_B_patch,local_H,'replicate','same');
 %         
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

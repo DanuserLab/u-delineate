@@ -11,7 +11,7 @@ function  [lowThresh, highThresh, current_seg]...
 %    current_seg:                 the segmented results, this serves as the starting point of the graphic matching
 % 
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

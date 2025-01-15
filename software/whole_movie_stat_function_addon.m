@@ -3,7 +3,7 @@ function Whole_movie_stat_cell = whole_movie_stat_function_addon(movieData)
 %%
 % Find the package of Filament Analysis
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

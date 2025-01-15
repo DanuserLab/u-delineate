@@ -8,7 +8,7 @@ function  [T_otsu, current_all_matching_bw, current_model ]  = geoBasedNmsSeg_wi
 %    current_all_matching_bw:           the segmented results, this serves as the starting point of the graphic matching
 %
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

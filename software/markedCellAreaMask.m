@@ -2,7 +2,7 @@ function cellMaskCell = markedCellAreaMask(MD)
 % function to get cell mask from marked single cells
 % Liya Ding, Jan, 2015
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

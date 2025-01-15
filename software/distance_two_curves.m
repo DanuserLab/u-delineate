@@ -1,7 +1,7 @@
 function [ind, distance] = distance_two_curves(c1_yx, c2_yx)
 %% Calculate the distance of two curve segments( defined by the points on the curve)
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

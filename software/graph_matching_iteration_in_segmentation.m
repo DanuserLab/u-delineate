@@ -25,7 +25,7 @@ F_classifer = @(int,length) (((T_xie_int_train + (T_xie_int_train/T_xie_length_t
 % Good_ind = find(F_classifer(feature_MeanNMS, feature_Length)>0);
 % Bad_ind = find(F_classifer(feature_MeanNMS, feature_Length)==0);
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

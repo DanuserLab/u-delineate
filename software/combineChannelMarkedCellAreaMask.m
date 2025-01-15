@@ -5,7 +5,7 @@ function combineChannelCellMaskCell = combineChannelMarkedCellAreaMask(MD)
 % Input:
 %   MD:     The movieList object loaded before running this function
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

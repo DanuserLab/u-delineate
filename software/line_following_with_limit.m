@@ -5,7 +5,7 @@ function [line_x, line_y] = line_following_with_limit(bw_in, radius, end_point_x
 %        end_point_x/y: the end point to start following
 % output: line_x/y: the traced line pixels (in order)
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

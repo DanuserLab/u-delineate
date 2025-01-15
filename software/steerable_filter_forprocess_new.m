@@ -23,7 +23,7 @@ function steerable_filter_forprocess_new(movieDataOrProcess, varargin)
 % The way steerable_filter_forprocess was written is outdated, and not compatible with features on packageGUI, etc.
 % Hillary Wong & Qiongjing (Jenny) Zou, Nov 2024
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

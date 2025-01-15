@@ -4,7 +4,7 @@ function processGUI_ApplyFcn_without_close_figure(hObject, eventdata, handles,fu
 %
 % Sebastien Besson May 2011 (last modified Oct 2011)
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 

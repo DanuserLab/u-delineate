@@ -2,7 +2,7 @@ function output_strs = all_uncommon_str_takeout(input_strs)
 
 % old fashion, when only one file, only the last character is kept.
 %
-% Copyright (C) 2024, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 
