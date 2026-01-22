@@ -22,7 +22,7 @@ function filament_segmentation_new(movieDataOrProcess, varargin)
 % The way filament_segmentation was written is outdated, and not compatible with features on packageGUI, etc.
 % Hillary Wong & Qiongjing (Jenny) Zou, December 2024
 %
-% Copyright (C) 2025, Danuser Lab - UTSouthwestern 
+% Copyright (C) 2026, Danuser Lab - UTSouthwestern 
 %
 % This file is part of FilamentAnalysisPackage.
 % 
